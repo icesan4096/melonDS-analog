@@ -161,6 +161,7 @@ public:
 
     void touchScreen(int x, int y);
     void releaseScreen();
+    void convertAnalogToTouch();
 
     // mic start/stop control from core
     void micStart();
@@ -376,6 +377,9 @@ private:
 
     bool isTouching;
     melonDS::u16 touchX, touchY;
+    bool touchingByMouse;
+    melonDS::u16 analogTouchActive;
+    float previousTouchX, previousTouchY;
 
     friend class EmuThread;
     friend class MainWindow;

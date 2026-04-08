@@ -92,6 +92,10 @@ void EmuInstance::inputInit()
     lastHotkeyMask = 0;
 
     isTouching = false;
+    touchingByMouse = false;
+    analogTouchActive = 0;
+    previousTouchX = 0.0f;
+    previousTouchY = 0.0f;
     touchX = 0;
     touchY = 0;
 
@@ -438,6 +442,8 @@ void EmuInstance::inputProcess()
             if (joystickButtonDown(joyMapping[i]))
                 joyInputMask &= ~(1 << i);
     }
+    
+    convertAnalogToTouch();
 
     inputMask = keyInputMask & joyInputMask;
 
@@ -461,9 +467,57 @@ void EmuInstance::touchScreen(int x, int y)
     touchX = x;
     touchY = y;
     isTouching = true;
+    touchingByMouse = true;
 }
 
 void EmuInstance::releaseScreen()
 {
     isTouching = false;
+    touchingByMouse = false;
+}
+
+// beware, all of this is a HACK
+#define DS_SCREEN_CENTER_X 128
+#define DS_SCREEN_CENTER_Y 96
+
+#define INITIAL_ANCHOR_TIMER 9
+#define VELOCITY_THRESHOLD 0.2f
+#define EXPIRY_TIMER 16
+#define MAXIMUM_RADIUS 32.0
+
+const float minimum_velocity = std::pow((float)(VELOCITY_THRESHOLD), 2.0f);
+void EmuInstance::convertAnalogToTouch()
+{
+    if (!joystick) return;
+    
+    float fx = (float)SDL_JoystickGetAxis(joystick, 0) / 32768.0f;
+    float fy = (float)SDL_JoystickGetAxis(joystick, 1) / 32768.0f;
+    
+    if ((std::fabs(fx) < 0.2f) && (std::fabs(fy) < 0.2f))
+    {
+        if ((std::pow(previousTouchX - fx, 2.0) + std::pow(previousTouchY - fy, 2.0)) < minimum_velocity)
+        {
+            previousTouchX = 0.0f;
+            previousTouchY = 0.0f;
+            
+            analogTouchActive = 0;
+            isTouching = touchingByMouse;
+            return;
+        }
+    }
+    
+    if (analogTouchActive > INITIAL_ANCHOR_TIMER)
+    {
+        touchX = DS_SCREEN_CENTER_X + (MAXIMUM_RADIUS * fx);
+        touchY = DS_SCREEN_CENTER_Y + (MAXIMUM_RADIUS * fy);
+    }
+    else
+    {
+        touchX = DS_SCREEN_CENTER_X;
+        touchY = DS_SCREEN_CENTER_Y;
+        
+        analogTouchActive++;
+    }
+    
+    isTouching = true;
 }
